@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" integrity="sha512-MV7K8+y+gLIBoVD59lQIYicR65iaqukzvf/nwasF0nqhPay5w/9lJmVM2hMDcnK1OnMGCdVK+iQrJ7lzPJQd1w==" crossorigin="anonymous" referrerpolicy="no-referrer"
+    />
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .search-form {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .search-form input[type="text"] {
+            padding: 5px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .search-form button {
+            padding: 5px 10px;
+            font-size: 16px;
+            background-color: #0c2f54;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .search-form button:hover {
+            background-color: #0a2246;
+        }
+        
+        .invoice-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .invoice {
+            border: 1px solid #ddd;
+            margin: 10px;
+            padding: 20px;
+            width: calc(50% - 20px);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .invoice span,
+        .invoice button {
+            display: block;
+            margin: 5px 0;
+        }
+        
+        .invoice button {
+            background-color: #0c2f54;
+            color: white;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+        }
+        
+        .invoice button:hover {
+            background-color: #0a2246;
+        }
+        
+        @media screen and (max-width: 600px) {
+            .invoice {
+                width: calc(100% - 20px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="search-form">
+        <form id="searchForm">
+            <input type="text" id="searchInput" placeholder="Search by Item Label...">
+            <button type="button" onclick="searchInvoices()">Search</button>
+        </form>
+    </div>
+
+    <div id="invoicesContainer"></div>
+
+    <script>
+        function fetchInvoices() {
+            return fetch('https://elhoussam.github.io/invoicesapi/db.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch data. Status code: ${response.status}`);
+                    }
+                    return response.json();
+                });
+        }
+
+        function displayInvoices(invoices) {
+            const invoicesContainer = document.getElementById('invoicesContainer');
+            invoicesContainer.innerHTML = ''; // Clear previous content
+
+            if (invoices.length === 0) {
+                invoicesContainer.innerHTML = '<p>No invoices found.</p>';
+                return;
+            }
+
+            const invoiceList = document.createElement('div');
+            invoiceList.className = 'invoice-list';
+
+            invoices.forEach(invoice => {
+                const invoiceElement = document.createElement('div');
+                invoiceElement.className = 'invoice';
+
+                invoiceElement.innerHTML = `
+                <span><strong>Facture  ID:</strong> ${invoice['InvoiceID']}</span>
+                <span><strong>Date de facture :</strong> ${invoice['InvoiceDate']}</span>
+                <span><strong>Nom de Client:</strong> ${invoice['ClientName']}</span>
+                <span><strong>Nom de fournisseur:</strong> ${invoice['SupplierName']}</span>
+                <span><strong>Montant TTC:</strong> ${calculateTotalTTC(invoice)}</span>
+                <button onclick="viewInvoiceDetails('${invoice['InvoiceID']}')"> L’Affichage les détails de facture</button>
+                <button onclick="printInvoice('${invoice['InvoiceID']}')">L’Impression de facture </button>
+            `;
+
+                invoiceList.appendChild(invoiceElement);
+            });
+
+            invoicesContainer.appendChild(invoiceList);
+        }
+
+        function viewInvoiceDetails(invoiceId) {
+            fetchInvoices()
+            .then(invoices => {
+                const invoiceDetails = invoices.find(invoice => invoice['InvoiceID'] === invoiceId);
+
+                if (invoiceDetails) {
+                    const invoiceDetailsHTML = `
+                        <div class="invoice-details">
+                            <h2>Invoice Details: ${invoiceDetails['InvoiceID']}</h2>
+                            <p>Date: ${invoiceDetails['InvoiceDate']}</p>
+                            <p>Client: ${invoiceDetails['ClientName']}</p>
+                            <p>Supplier: ${invoiceDetails['SupplierName']}</p>
+                            <h3>Items:</h3>
+                            <ul>
+                                ${invoiceDetails['InvoiceItems'].map(item => `
+                                    <li>${item['ItemLibelle']} - Quantity: ${item['ItemQuantity']}, Price: ${item['ItemPrice']}, Tax: ${item['ItemTax']}, Total: ${(item['ItemPrice'] + item['ItemTax']).toFixed(2)}</li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+
+                    document.getElementById('invoicesContainer').innerHTML = invoiceDetailsHTML;
+                } else {
+                    alert('Invoice details not found.');
+                }
+            })
+            .catch(error => console.error(error));
+        }
+
+        function searchInvoices() {
+            const searchInput = document.getElementById('searchInput');
+        const searchKeyword = searchInput.value.trim().toLowerCase();
+
+        fetchInvoices()
+            .then(invoices => {
+                const filteredInvoices = invoices.filter(invoice =>
+                    invoice['InvoiceItems'].some(item =>
+                        item['ItemLibelle'].toLowerCase().includes(searchKeyword)
+                    )
+                );
+
+                displayInvoices(filteredInvoices);
+            })
+            .catch(error => console.error(error));
+        }
+
+        function printInvoice(invoiceId) {
+            fetchInvoices()
+                .then(invoices => {
+                        const invoiceToPrint = invoices.find(invoice => invoice['InvoiceID'] === invoiceId);
+                        if (!invoiceToPrint) {
+                            alert('Invoice not found for printing.');
+                            return;
+                        }
+
+                        // Calcul du total TTC des articles
+                        const totalTtcItems = invoiceToPrint['InvoiceItems'].reduce((total, item) => {
+                    
+
+                            return total + ((item['ItemPrice'] * (item['ItemTax'] / 100))+ item['ItemPrice'])*item['ItemQuantity'];
+                        }, 0).toFixed(2);
+
+                        // Calcul de la TVA à 10% du total TTC des articles
+                        const tva = (totalTtcItems * 0.1).toFixed(2);
+
+                        // Calcul du total TTC de l'ensemble (total TTC des articles + TVA)
+                        const totalTtcEnsemble = (parseFloat(totalTtcItems) + parseFloat(tva)).toFixed(2);
+
+
+                        const invoiceDetails = `
+                <h1>facture N: ${invoiceToPrint['InvoiceID']}</h1>
+                <p>Date: ${invoiceToPrint['InvoiceDate']}</p>
+                <div class="fournisseur">
+                <p>nom de entreprise: ${invoiceToPrint['SupplierName']}</p>
+                <p>Number de fournisseur : ${invoiceToPrint['SupplierPhone']}</p>
+                <p>Addresse de fournisseur : ${invoiceToPrint['SupplierAddress']}</p>
+                <p>Bank : ${invoiceToPrint['SupplierBank']}</p>
+
+                </div> 
+                <div class="client">
+                <p>Nom de Client: ${invoiceToPrint['ClientName']}</p>
+                <p>numero telephone client   : ${invoiceToPrint['ClientPhone']}</p>
+                <p>Addresse de client  : ${invoiceToPrint['ClientAddress']}</p>
+                <p>ClientBank : ${invoiceToPrint['ClientBank']}</p>
+                </div>       
+                
+            
+
+               
+                <table>
+                    <thead>
+                        <tr>
+                            <th>N</th>
+                            <th>LIBELLE</th>
+                            <th>QUANTITÉ</th>
+                            <th>PRIX</th>
+                            <th>HT</th>
+                            <th>TTC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${invoiceToPrint['InvoiceItems'].map((item, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${item['ItemLibelle']}</td>
+                                <td>${item['ItemQuantity']}</td>
+                                <td>${item['ItemPrice']}</td>
+                                <td>${item['ItemPrice']}</td>
+                                <td>${(((item['ItemPrice'] * (item['ItemTax'] / 100))+ item['ItemPrice'])*item['ItemQuantity']).toFixed(2)}</td>
+
+
+
+                            </tr>
+                        `).join('')}
+                        <tr>
+                            <td colspan="5" style="text-align: right;">Total TTC des articles:</td>
+                            <td>${totalTtcItems}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" style="text-align: right;">TVA (10%):</td>
+                            <td>${tva}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" style="text-align: right;">Total TTC de l'ensemble:</td>
+                            <td>${totalTtcEnsemble}</td>
+                            
+                        </tr>
+
+
+                         
+                        
+                    </tbody>
+
+                    
+                </table>
+                <p style="margin-top: 20px; float:right;">La signature:</p>
+            `;
+
+            const styles = `
+                <style>
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th, td {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                    }
+                    tr:nth-child(even) {background-color: #f9f9f9;}
+                    .fournisseur
+                    {
+                     float:left;
+                     
+                    }
+                    .client
+                    {
+                        float:right;
+                    }
+                </style>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.open();
+            printWindow.document.write(`<html><head><title>Print Invoice</title>${styles}</head><body>${invoiceDetails}</body></html>`);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        })
+        .catch(error => console.error(error));
+}
+
+function calculateTotalTTC(invoice) {
+    const totalTtcItems = invoice['InvoiceItems'].reduce((total, item) => {
+        return total + ((item['ItemPrice'] * (item['ItemTax'] / 100)) + item['ItemPrice']) * item['ItemQuantity'];
+    }, 0).toFixed(2);
+
+    const tva = (totalTtcItems * 0.1).toFixed(2);
+
+    const totalTtcEnsemble = (parseFloat(totalTtcItems) + parseFloat(tva)).toFixed(2);
+
+    return totalTtcEnsemble;
+}
+
+    // Initial load
+    fetchInvoices().then(displayInvoices).catch(error => console.error(error));
+    </script>
+
+</body>
+
+</html>
